@@ -42,78 +42,10 @@
     const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
     window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    (async () => {
-      // Verificar admin
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert('Login required');
-        window.location.href = 'index.html';
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (!['mod', 'owner'].includes(profile?.role)) {
-        alert('Mods/Owners only');
-        window.location.href = 'index.html';
-        return;
-      }
-
-      // Cargar imágenes
-      const { data: images, error } = await supabase
-        .from('images')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      const loading = document.getElementById('loading');
-      const grid = document.getElementById('admin-grid');
-      const empty = document.getElementById('empty-state');
-
-      loading.style.display = 'none';
-
-      if (error) {
-        alert('Error: ' + error.message);
-        return;
-      }
-
-      if (!images || images.length === 0) {
-        empty.style.display = 'block';
-        return;
-      }
-
-      grid.style.display = 'grid';
-      images.forEach(img => {
-        const card = document.createElement('div');
-        card.className = 'image-card';
-        card.innerHTML = `
-          <button class="delete-btn" onclick="deleteImage('${img.id}', '${img.url}')">DELETE</button>
-          <img src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
-          <h3>${img.title || 'no title'}</h3>
-          <p>${img.description || 'no description'}</p>
-          <div class="user-id">by: ${img.uploaded_by ? img.uploaded_by.slice(0,8) + '...' : 'unknown'}</div>
-        `;
-        grid.appendChild(card);
-      });
-    })();
-
     async function deleteImage(imageId, imageUrl) {
-      if (!confirm('¿Borrar esta imagen permanentemente?')) return;
+      if (!confirm('⚠️ ¿Borrar esta imagen permanentemente?\n(Esta acción no se puede deshacer)')) return;
 
       try {
-        // 1. Borrar de storage (opcional)
-        if (imageUrl) {
-          const urlParts = imageUrl.split('/images/')[1];
-          if (urlParts) {
-            const fileName = urlParts.split('?')[0];
-            await supabase.storage.from('images').remove([fileName]);
-          }
-        }
-
-        // 2. Borrar de database
         const { error } = await supabase
           .from('images')
           .delete()
@@ -121,12 +53,80 @@
 
         if (error) throw error;
 
-        alert('✅ Imagen borrada');
+        alert('✅ Imagen eliminada');
         location.reload();
       } catch (error) {
-        alert('❌ Error: ' + error.message);
+        console.error('Delete error:', error);
+        alert('❌ Error al borrar:\n' + (error.message || 'Unknown error'));
       }
     }
+
+    (async () => {
+      // 🔒 Verificación inmediata de autenticación y rol
+      const {  { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        window.location.href = './';
+        return;
+      }
+
+      const {  profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      // 🔁 Redirigir SI NO es mod ni owner
+      if (!profile || !['mod', 'owner'].includes(profile.role)) {
+        window.location.href = './';
+        return;
+      }
+
+      // ✅ Si llega aquí, es admin → cargar imágenes
+      const loading = document.getElementById('loading');
+      const grid = document.getElementById('admin-grid');
+      const empty = document.getElementById('empty-state');
+
+      try {
+        const {  images, error } = await supabase
+          .from('images')
+          .select('id, url, title, description, user_id, created_at')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        loading.style.display = 'none';
+
+        if (!images || images.length === 0) {
+          empty.style.display = 'block';
+          return;
+        }
+
+        grid.style.display = 'grid';
+        images.forEach(img => {
+          const escape = (str) => (str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const title = escape(img.title) || 'no title';
+          const desc = escape(img.description) || 'no description';
+          const userId = img.user_id ? img.user_id.substring(0, 8) + '...' : 'unknown';
+
+          const card = document.createElement('div');
+          card.className = 'image-card';
+          card.innerHTML = `
+            <button class="delete-btn" onclick="deleteImage('${img.id}', '${img.url.replace(/'/g, "\\'")}')">DELETE</button>
+            <img src="${img.url}" alt="${title}" loading="lazy" onerror="this.style.opacity=0.6">
+            <h3>${title}</h3>
+            <p>${desc}</p>
+            <div class="user-id">by: ${userId}</div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (error) {
+        loading.style.display = 'none';
+        console.error(error);
+        alert('❌ Error al cargar el panel');
+        window.location.href = './';
+      }
+    })();
   </script>
 </body>
 </html>
