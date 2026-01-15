@@ -130,38 +130,66 @@ document.addEventListener('DOMContentLoaded', async () => {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const file = document.getElementById('imageFile').files[0];
-    if (!file) return showStatus('Select image', 'error');
+    const fileInput = document.getElementById('imageFile');
+    const file = fileInput.files[0];
+    
+    if (!file) return showStatus('Select an image', 'error');
+    
+    // Validar tipo de imagen
+    if (!file.type.startsWith('image/')) {
+      return showStatus('File must be an image', 'error');
+    }
+
+    // Limitar tamaño (opcional, ej. 10 MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return showStatus('Image too large (max 10MB)', 'error');
+    }
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
     showStatus('Uploading to storage...', 'uploading');
 
     try {
-      // 1. STORAGE (con upsert para evitar conflictos)
-      const fileName = `${Date.now()}-${file.name}`;
+      // Nombre seguro para el archivo
+      const ext = file.name.split('.').pop().toLowerCase();
+      const safeName = file.name
+        .replace(/\s+/g, '-')     // espacios → guiones
+        .replace(/[^a-z0-9.-]/gi, '') // solo alfanum, puntos, guiones
+        .replace(/--+/g, '-');    // evitar guiones dobles
+      
+      const fileName = `${Date.now()}-${safeName}`;
+      
+      // 1. Subir a Storage
       const { error: uploadError } = await supabase.storage
         .from('images')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw new Error(uploadError.message);
 
-      // 2. URL pública
-      const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
+      // 2. Obtener URL pública
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      const publicUrl = data.publicUrl;
 
-      // 3. Database
-      await supabase.from('images').insert({
-        url: publicUrl,
-        uploaded_by: user.id,
-        title: document.getElementById('title').value || null,
-        description: document.getElementById('desc').value || null
-      });
+      if (!publicUrl) throw new Error('Failed to get public URL');
+
+      // 3. Insertar en DB — ¡USAR user_id!
+      const { error: dbError } = await supabase
+        .from('images')
+        .insert({
+          url: publicUrl,
+          user_id: user.id,  // ← ¡CORRECTO!
+          title: document.getElementById('title').value.trim() || null,
+          description: document.getElementById('desc').value.trim() || null
+        });
+
+      if (dbError) throw new Error(dbError.message);
 
       showStatus('✅ Uploaded!', 'success');
       form.reset();
+      fileInput.value = ''; // resetear input de archivo
     } catch (error) {
-      console.error('ERROR:', error);
-      showStatus('❌ ' + error.message, 'error');
+      console.error('Upload error:', error);
+      showStatus('❌ ' + (error.message || 'Unknown error'), 'error');
     } finally {
       uploadBtn.disabled = false;
       uploadBtn.textContent = 'Upload';
@@ -169,8 +197,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   function showStatus(msg, type) {
-    document.getElementById('status').textContent = msg;
-    document.getElementById('status').className = type;
+    statusDiv.textContent = msg;
+    statusDiv.className = type;
   }
 });
 </script>
