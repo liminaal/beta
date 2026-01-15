@@ -6,16 +6,7 @@
 <title>liminaal</title>
 <meta name="description" content="liminaal - eerie and aesthetic music gallery." />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const SUPABASE_URL = "https://niqcvctwikiluztlhkqs.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
 
-  window.supabase = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
-</script>
 
 <style>
   /* Screensaver */
@@ -298,7 +289,17 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
 
 <footer style="text-align:center;padding:2rem 0;color:rgba(245,245,245,.6)">&copy; liminaal</footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/supabase.js"></script>
+<script>
+  const SUPABASE_URL = "https://niqcvctwikiluztlhkqs.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
+
+  window.supabase = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+</script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('siteLoader');
