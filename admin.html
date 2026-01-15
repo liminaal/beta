@@ -62,38 +62,45 @@
     }
 
     (async () => {
-      // 🔒 Verificación inmediata de autenticación y rol
+      // 🔒 Verificación estricta de autenticación y rol
       const {  { user } } = await supabase.auth.getUser();
       
       if (!user) {
+        console.log("No authenticated user → redirecting to ./");
         window.location.href = './';
         return;
       }
 
-      const {  profile } = await supabase
+      const {  { profile }, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
 
-      // 🔁 Redirigir SI NO es mod ni owner
-      if (!profile || !['mod', 'owner'].includes(profile.role)) {
+      if (error || !profile || !profile.role) {
+        console.warn("Profile not found or invalid → redirecting to ./", { error, profile });
         window.location.href = './';
         return;
       }
 
-      // ✅ Si llega aquí, es admin → cargar imágenes
+      if (!['mod', 'owner'].includes(profile.role)) {
+        console.log("User role not authorized:", profile.role, "→ redirecting to ./");
+        window.location.href = './';
+        return;
+      }
+
+      // ✅ Usuario autorizado: cargar imágenes
       const loading = document.getElementById('loading');
       const grid = document.getElementById('admin-grid');
       const empty = document.getElementById('empty-state');
 
       try {
-        const {  images, error } = await supabase
+        const {  images, error: fetchError } = await supabase
           .from('images')
           .select('id, url, title, description, user_id, created_at')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (fetchError) throw fetchError;
 
         loading.style.display = 'none';
 
@@ -120,10 +127,9 @@
           `;
           grid.appendChild(card);
         });
-      } catch (error) {
-        loading.style.display = 'none';
-        console.error(error);
-        alert('❌ Error al cargar el panel');
+      } catch (err) {
+        console.error("Failed to load admin panel:", err);
+        alert('❌ Error al cargar el panel de administración');
         window.location.href = './';
       }
     })();
