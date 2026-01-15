@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - liminaal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#050505; --fg:#f5f5f5; --card-radius:12px;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:'Unbounded',sans-serif;min-height:100vh;padding:40px 20px}
+    .container{max-width:1200px;margin:0 auto}
+    h1{text-align:center;font-size:2.5rem;margin:0 0 2rem}
+    .back-link{display:inline-block;margin-bottom:2rem;color:var(--fg);text-decoration:none;font-size:1.1rem}
+    .admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem;margin-top:2rem}
+    .image-card{position:relative;background:linear-gradient(180deg,rgba(20,20,20,.95),rgba(8,8,8,.98));border-radius:var(--card-radius);padding:20px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.7)}
+    .image-card img{width:100%;height:220px;object-fit:cover;border-radius:8px;margin-bottom:12px}
+    .image-card h3{margin:0 0 8px;font-size:1.1rem;font-weight:700}
+    .image-card p{margin:0 0 12px;opacity:0.85;font-size:0.9rem}
+    .image-card .user-id{font-size:0.8rem;opacity:0.6;margin-bottom:12px}
+    .delete-btn{position:absolute;top:16px;right:16px;background:rgba(255,99,132,0.9);color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;font-family:'Unbounded';font-size:0.8rem;font-weight:700;transition:background 0.2s,transform 0.15s}
+    .delete-btn:hover{background:rgba(255,99,132,1);transform:scale(1.05)}
+    .loader{text-align:center;padding:40px;color:var(--fg);font-size:1.1rem}
+    .empty-state{text-align:center;padding:60px 20px;color:rgba(245,245,245,0.5)}
+    @media (max-width:700px){.admin-grid{gap:1rem}.image-card{padding:16px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← back to liminaal</a>
+    <h1>admin panel</h1>
+    
+    <div id="loading" class="loader">loading images...</div>
+    <div id="admin-grid" class="admin-grid" style="display:none;"></div>
+    <div id="empty-state" class="empty-state" style="display:none;">no images yet</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script>
+    const SUPABASE_URL = "https://niqcvctwikiluztlhkqs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
+    window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    (async () => {
+      // Verificar admin
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Login required');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (!['mod', 'owner'].includes(profile?.role)) {
+        alert('Mods/Owners only');
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Cargar imágenes
+      const { data: images, error } = await supabase
+        .from('images')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const loading = document.getElementById('loading');
+      const grid = document.getElementById('admin-grid');
+      const empty = document.getElementById('empty-state');
+
+      loading.style.display = 'none';
+
+      if (error) {
+        alert('Error: ' + error.message);
+        return;
+      }
+
+      if (!images || images.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+
+      grid.style.display = 'grid';
+      images.forEach(img => {
+        const card = document.createElement('div');
+        card.className = 'image-card';
+        card.innerHTML = `
+          <button class="delete-btn" onclick="deleteImage('${img.id}', '${img.url}')">DELETE</button>
+          <img src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
+          <h3>${img.title || 'no title'}</h3>
+          <p>${img.description || 'no description'}</p>
+          <div class="user-id">by: ${img.uploaded_by ? img.uploaded_by.slice(0,8) + '...' : 'unknown'}</div>
+        `;
+        grid.appendChild(card);
+      });
+    })();
+
+    async function deleteImage(imageId, imageUrl) {
+      if (!confirm('¿Borrar esta imagen permanentemente?')) return;
+
+      try {
+        // 1. Borrar de storage (opcional)
+        if (imageUrl) {
+          const urlParts = imageUrl.split('/images/')[1];
+          if (urlParts) {
+            const fileName = urlParts.split('?')[0];
+            await supabase.storage.from('images').remove([fileName]);
+          }
+        }
+
+        // 2. Borrar de database
+        const { error } = await supabase
+          .from('images')
+          .delete()
+          .eq('id', imageId);
+
+        if (error) throw error;
+
+        alert('✅ Imagen borrada');
+        location.reload();
+      } catch (error) {
+        alert('❌ Error: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>
