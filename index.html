@@ -7,7 +7,6 @@
 <meta name="description" content="liminaal - eerie and aesthetic music gallery." />
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
 
-
 <style>
   /* Screensaver */
   #screensaver {
@@ -64,7 +63,7 @@ iframe{border-radius:12px}
 .loader .dots { display:inline-block; width:36px; text-align:left; }
 .loader .dots span { display:inline-block; width:6px; height:6px; margin-right:4px; border-radius:50%; background:var(--fg); opacity:.18; transform:translateY(0); animation: dot 1s infinite linear; }
 .loader .dots span:nth-child(1){ animation-delay: 0s }
-.loader .dots span:nth-child(2){ animation-delay: 0.12s }
+loader .dots span:nth-child(2){ animation-delay: 0.12s }
 .loader .dots span:nth-child(3){ animation-delay: 0.24s }
 
 @keyframes dot {
@@ -130,7 +129,7 @@ iframe{border-radius:12px}
 .popup-close{position:absolute;top:18px;right:20px;background:rgba(255,255,255,.03);border:none;color:var(--fg);padding:8px 10px;border-radius:8px;cursor:pointer}
 
 /* Collaborators section — more space between gallery and collabs */
-.collab-wrap{margin-top:4rem} /* increased spacing */
+.collab-wrap{margin-top:4rem}
 .collab-head{display:flex;justify-content:center;align-items:center;gap:12px;margin:28px 0 8px}
 .collab-head h2{margin:0;font-size:1.6rem}
 .collaborators{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}
@@ -163,7 +162,89 @@ iframe{border-radius:12px}
   .popup-collab .popup-inner{flex-direction:column}
   .popup-collab .collab-left{flex-basis:auto;height:45vw;max-height:55vh}
 }
-@media (max-width:700px){.image-box{height:200px}.hover-preview{display:none}.collaborators{gap:.6rem}.collaborator{width:46%;min-width:140px} }
+@media (max-width:700px){
+  .image-box{height:200px}
+  .hover-preview{display:none}
+  .collaborators{gap:.6rem}
+  .collaborator{width:46%;min-width:140px}
+}
+
+/* AUTH BOX STYLING */
+#auth-box{
+  max-width:460px;
+  margin:0 auto 2.5rem;
+  padding:14px 18px;
+  border-radius:999px;
+  background:radial-gradient(circle at 0 0,rgba(255,255,255,0.08) 0,transparent 45%),
+             linear-gradient(120deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));
+  box-shadow:0 16px 50px rgba(0,0,0,0.65);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  font-size:.86rem;
+}
+#auth-box .pill-email{
+  padding:6px 10px;
+  border-radius:999px;
+  background:rgba(0,0,0,0.55);
+  font-weight:700;
+  font-size:.8rem;
+  max-width:230px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#auth-box a,
+#auth-box button{
+  font-family:'Unbounded',sans-serif;
+  font-size:.82rem;
+  border-radius:999px;
+  border:none;
+  padding:7px 14px;
+  cursor:pointer;
+  text-decoration:none;
+  color:var(--fg);
+  background:rgba(245,245,245,0.05);
+  transition:background .2s,transform .15s,box-shadow .15s;
+}
+#auth-box a:hover,
+#auth-box button:hover{
+  background:rgba(245,245,245,0.16);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px rgba(0,0,0,0.55);
+}
+#auth-box button#logoutBtn{
+  background:rgba(255,99,132,0.18);
+}
+#auth-box button#logoutBtn:hover{
+  background:rgba(255,99,132,0.32);
+}
+
+/* Upload CTA, only shown when logged in */
+#upload-cta{
+  margin:1.2rem auto 0;
+  display:flex;
+  justify-content:center;
+}
+#upload-cta a{
+  font-family:'Unbounded',sans-serif;
+  text-decoration:none;
+  padding:10px 20px;
+  border-radius:999px;
+  font-size:.84rem;
+  letter-spacing:0.04em;
+  text-transform:lowercase;
+  color:var(--bg);
+  background:linear-gradient(135deg,#f5f5f5,#d7d0ff);
+  box-shadow:0 12px 35px rgba(0,0,0,0.7);
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+#upload-cta a:hover{
+  transform:translateY(-2px);
+  box-shadow:0 18px 45px rgba(0,0,0,0.85);
+  filter:brightness(1.03);
+}
 </style>
 </head>
 <body>
@@ -182,10 +263,20 @@ iframe{border-radius:12px}
     <iframe id="iframe-ss" src="/assets/screensaver" width="100%" height="100%" frameborder="0"></iframe>
   </div>
 
+  <!-- AUTH BOX se rellena por JS -->
+  <div id="auth-box"></div>
+  <!-- CTA upload, se muestra solo con sesión -->
+  <div id="upload-cta" style="display:none;">
+    <a href="upload.html">upload to liminaal</a>
+  </div>
+
   <h1>liminaal</h1>
 
   <div class="spotify-player">
-    <iframe src="https://open.spotify.com/embed/playlist/5xzeVvVZU6mCfSwALg1yNp?utm_source=generator" width="100%" height="152" frameborder="0" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+    <iframe src="https://open.spotify.com/embed/playlist/5xzeVvVZU6mCfSwALg1yNp?utm_source=generator"
+      width="100%" height="152" frameborder="0"
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy"></iframe>
   </div>
 
   <div class="image-placeholder">
@@ -236,18 +327,6 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
         <div class="name">Awitax</div>
         <div class="role"></div>
       </div>
-
-      <!-- Example block for adding more collaborators -->
-      <!--
-      <div class="collaborator"
-           data-coll-img="/assets/mii/NAME head.png"
-           data-coll-img-full="/assets/mii/NAME full.png"
-           data-coll-desc="NAME — role description here.">
-        <img src="/assets/mii/NAME head.png" alt="NAME">
-        <div class="name">NAME</div>
-        <div class="role"></div>
-      </div>
-      -->
     </div>
   </div>
 </div>
@@ -300,13 +379,14 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
     SUPABASE_ANON_KEY
   );
 </script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const loader = document.getElementById('siteLoader');
   const siteContent = document.getElementById('siteContent');
 
-  // Keep loader visible until everything is loaded.
   function hideLoader() {
+    if(!loader || !siteContent) return;
     loader.classList.add('hidden');
     loader.setAttribute('aria-hidden','true');
     siteContent.setAttribute('aria-hidden','false');
@@ -317,7 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('load', () => setTimeout(hideLoader, 160));
   }
 
-  // Helper: prefer high-res variant (filename@2x.ext) if available
   function highResPath(path){
     if(!path) return path;
     const parts = path.split('.');
@@ -327,7 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return base + '@2x.' + ext;
   }
 
-  // Gallery interactions (hover preview + popup)
   const boxes = document.querySelectorAll('.image-box');
   const hoverPreview = document.getElementById('hoverPreview');
   const previewThumb = document.getElementById('previewThumb');
@@ -409,7 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
     hoverPreview.style.display = 'none';
   }
 
-  // Collaborator cards entrance + click -> collaborator popup
   const collaborators = document.querySelectorAll('.collaborator');
   const popupCollab = document.getElementById('popup-collab');
   const popupCollabImg = document.getElementById('popup-collab-img');
@@ -417,12 +494,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const popupCollabDesc = document.getElementById('popup-collab-desc');
   const popupCollabClose = document.getElementById('popup-collab-close');
 
-  // staggered entrance
   collaborators.forEach((coll, idx) => {
     setTimeout(()=> coll.classList.add('visible'), 80 * idx + 120);
   });
 
-  // click handler for collaborators
   collaborators.forEach(coll => {
     coll.addEventListener('click', () => {
       const fullAttr = coll.getAttribute('data-coll-img-full') || coll.dataset.collImgFull || '';
@@ -431,7 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const chosen = fullAttr || headAttr || tileImg || '';
       const candidate = highResPath(chosen);
 
-      // set image with fallback
       popupCollabImg.src = candidate;
       popupCollabImg.onerror = () => { popupCollabImg.onerror = null; popupCollabImg.src = chosen; };
 
@@ -439,7 +513,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const desc = coll.getAttribute('data-coll-desc') || coll.dataset.collDesc || '';
 
       popupCollabTitle.textContent = name;
-      // allow newlines in the data attribute to show as <br>
       popupCollabDesc.innerHTML = (desc || "").replace(/\n/g, "<br>");
 
       popupCollab.classList.add('active');
@@ -454,20 +527,17 @@ document.addEventListener('DOMContentLoaded', () => {
     popupCollabImg.src = '';
     document.body.style.overflow = '';
   }
-  // click outside to close
   popupCollab.addEventListener('click', e => { if(e.target === popupCollab) closeCollabPopup(); });
   popupCollabClose.addEventListener('click', closeCollabPopup);
-  // ESC closes collab popup too
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && popupCollab.classList.contains('active')) closeCollabPopup(); });
 
 });
 </script>
 
 <script>
-  // Screensaver idle timer (separate to avoid accidental closure by missing DOM events)
   (function(){
     let idleTimer;
-    const SCREENSAVER_DELAY = 5 * 60 * 1000; // 5 minutes
+    const SCREENSAVER_DELAY = 5 * 60 * 1000;
     const screensaver = document.getElementById('screensaver');
 
     function showScreensaver(){
@@ -485,40 +555,36 @@ document.addEventListener('DOMContentLoaded', () => {
       idleTimer = setTimeout(showScreensaver, SCREENSAVER_DELAY);
     }
 
-    // events that count as activity
     ['mousemove','mousedown','touchstart','keydown','scroll'].forEach(ev => {
       document.addEventListener(ev, resetTimer, {passive:true});
     });
 
-    // start on load
     resetTimer();
   })();
 </script>
+
 <script>
 (async () => {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
 
-  // Crear contenedor auth si no existe
-  let authBox = document.getElementById("auth-box");
-  if (!authBox) {
-    authBox = document.createElement("div");
-    authBox.id = "auth-box";
-    authBox.style.textAlign = "center";
-    authBox.style.marginBottom = "2rem";
-    document.querySelector(".container").prepend(authBox);
-  }
+  const authBox = document.getElementById("auth-box");
+  const uploadCta = document.getElementById("upload-cta");
 
   if (!user) {
     authBox.innerHTML = `
-      <a href="login.html">Login</a> · 
+      <a href="login.html">Login</a>
+      <span style="opacity:.45;">·</span>
       <a href="register.html">Register</a>
     `;
+    uploadCta.style.display = "none";
   } else {
     authBox.innerHTML = `
-      <span>${user.email}</span> ·
+      <span class="pill-email">${user.email}</span>
       <button id="logoutBtn">Logout</button>
     `;
+    uploadCta.style.display = "flex";
+
     document.getElementById("logoutBtn").onclick = async () => {
       await supabase.auth.signOut();
       location.reload();
