@@ -493,5 +493,37 @@ document.addEventListener('DOMContentLoaded', () => {
     resetTimer();
   })();
 </script>
+<script>
+(async () => {
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+
+  // Crear contenedor auth si no existe
+  let authBox = document.getElementById("auth-box");
+  if (!authBox) {
+    authBox = document.createElement("div");
+    authBox.id = "auth-box";
+    authBox.style.textAlign = "center";
+    authBox.style.marginBottom = "2rem";
+    document.querySelector(".container").prepend(authBox);
+  }
+
+  if (!user) {
+    authBox.innerHTML = `
+      <a href="/login.html">Login</a> · 
+      <a href="/register.html">Register</a>
+    `;
+  } else {
+    authBox.innerHTML = `
+      <span>${user.email}</span> ·
+      <button id="logoutBtn">Logout</button>
+    `;
+    document.getElementById("logoutBtn").onclick = async () => {
+      await supabase.auth.signOut();
+      location.reload();
+    };
+  }
+})();
+</script>
 </body>
 </html>
