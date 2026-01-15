@@ -525,12 +525,5 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 })();
 </script>
-  <script>
-(async () => {
-  const { data } = await supabase.auth.getUser();
-  console.log("USER:", data.user);
-})();
-</script>
-
 </body>
 </html>
