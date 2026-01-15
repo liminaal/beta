@@ -63,7 +63,7 @@ iframe{border-radius:12px}
 .loader .dots { display:inline-block; width:36px; text-align:left; }
 .loader .dots span { display:inline-block; width:6px; height:6px; margin-right:4px; border-radius:50%; background:var(--fg); opacity:.18; transform:translateY(0); animation: dot 1s infinite linear; }
 .loader .dots span:nth-child(1){ animation-delay: 0s }
-loader .dots span:nth-child(2){ animation-delay: 0.12s }
+.loader .dots span:nth-child(2){ animation-delay: 0.12s }
 .loader .dots span:nth-child(3){ animation-delay: 0.24s }
 
 @keyframes dot {
@@ -270,6 +270,7 @@ loader .dots span:nth-child(2){ animation-delay: 0.12s }
 }
 </style>
 </head>
+  
 <body>
 <!-- Loader -->
 <div class="loader" id="siteLoader" role="status" aria-hidden="false">
@@ -306,7 +307,8 @@ loader .dots span:nth-child(2){ animation-delay: 0.12s }
       loading="lazy"></iframe>
   </div>
 
-  <div class="image-placeholder">
+  <div class="image-placeholder" id="image-placeholder">
+    <!-- TUS 4 IMÁGENES ORIGINALES (siempre arriba) -->
     <div class="image-box" data-title="Abandoned Hospital" data-desc="Abandoned hospital found..." data-img="/assets/images/hospital.png">
       <img class="thumb" src="/assets/images/hospital.png" alt="Abandoned Hospital" loading="lazy" decoding="async">
       <div class="meta"><div class="title">Abandoned Hospital</div><div class="sub">found - november 2025</div></div>
@@ -326,6 +328,8 @@ loader .dots span:nth-child(2){ animation-delay: 0.12s }
       <img class="thumb" src="/assets/images/unknown.png" alt="???" loading="lazy" decoding="async">
       <div class="meta"><div class="title">???</div><div class="sub">???</div></div>
     </div>
+
+    <!-- AQUÍ VAN LAS SUBIDAS (se llenan con JS) -->
   </div>
 
   <!-- Collaborators Section -->
@@ -342,7 +346,7 @@ loader .dots span:nth-child(2){ animation-delay: 0.12s }
 he started when he was 11 y/o creating a Minecraft bot, then started taking ambiental photos when he was 13.">
         <img src="/assets/mii/Kaido head.png" alt="Kaido">
         <div class="name">Kaido</div>
-        <div class="role"></div>
+        <div class="role">photographer</div>
       </div>
 
       <!-- Awitax -->
@@ -352,7 +356,7 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
            data-coll-desc="Awitax — a young girl that loves drawing & gaming.">
         <img src="/assets/mii/Awitax head.png" alt="Awitax">
         <div class="name">Awitax</div>
-        <div class="role"></div>
+        <div class="role">photographer & designer</div>
       </div>
     </div>
   </div>
@@ -611,11 +615,11 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 </script>
 
+<!-- ✅ SCRIPT ACTUALIZADO: AUTENTICACIÓN + CARGA DE IMÁGENES COMUNITARIAS -->
 <script>
 (async () => {
   const { data } = await supabase.auth.getUser();
   const user = data.user;
-
   const authBox = document.getElementById("auth-box");
   const uploadCta = document.getElementById("upload-cta");
 
@@ -632,11 +636,76 @@ document.addEventListener('DOMContentLoaded', () => {
       <button id="logoutBtn">Logout</button>
     `;
     uploadCta.style.display = "flex";
-
     document.getElementById("logoutBtn").onclick = async () => {
       await supabase.auth.signOut();
       location.reload();
     };
+  }
+
+  // CARGAR IMÁGENES SUBIDAS
+  try {
+    const { data: images } = await supabase
+      .from('images')
+      .select('url, title, description, created_at')
+      .order('created_at', { ascending: false })
+      .limit(12);
+
+    if (images && images.length > 0) {
+      const container = document.getElementById('image-placeholder');
+      
+      images.slice(0, 8).forEach(img => {  // Solo 8 primeras
+        const box = document.createElement('div');
+        box.className = 'image-box';
+        box.dataset.title = img.title || 'community upload';
+        box.dataset.desc = img.description || 'liminaal';
+        box.dataset.img = img.url;
+        
+        box.innerHTML = `
+          <img class="thumb" src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
+          <div class="meta">
+            <div class="title">${img.title || 'community'}</div>
+            <div class="sub">${new Date(img.created_at).toLocaleDateString('en-CA', { 
+              month: 'short', 
+              year: 'numeric' 
+            })}</div>
+          </div>
+        `;
+        
+        container.appendChild(box);
+        
+        // Event listeners para hover/popup (igual que las originales)
+        box.addEventListener('mouseenter', e => {
+          const hoverPreview = document.getElementById('hoverPreview');
+          const previewThumb = document.getElementById('previewThumb');
+          const previewTitle = document.getElementById('previewTitle');
+          const previewDesc = document.getElementById('previewDesc');
+          
+          previewThumb.src = img.url;
+          previewTitle.textContent = box.dataset.title;
+          previewDesc.textContent = box.dataset.desc;
+          hoverPreview.classList.add('active');
+        });
+        
+        box.addEventListener('mouseleave', () => {
+          document.getElementById('hoverPreview').classList.remove('active');
+        });
+        
+        box.addEventListener('click', () => {
+          const popup = document.getElementById('popup');
+          const popupImg = document.getElementById('popup-img');
+          const popupTitle = document.getElementById('popup-title');
+          const popupDesc = document.getElementById('popup-desc');
+          
+          popupImg.src = img.url;
+          popupTitle.textContent = box.dataset.title;
+          popupDesc.textContent = box.dataset.desc;
+          popup.classList.add('active');
+          document.body.style.overflow = 'hidden';
+        });
+      });
+    }
+  } catch (e) {
+    console.log('No images yet');
   }
 })();
 </script>
