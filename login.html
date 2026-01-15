@@ -80,23 +80,23 @@
 <script src="/supabase.js"></script>
 
 <script>
-  document.getElementById("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    const email = email.value;
-    const password = password.value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      window.location.href = "/";
-    }
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password
   });
+
+  if (error) {
+    alert(error.message);
+  } else {
+    window.location.href = "/";
+  }
+});
 </script>
 
 </body>
