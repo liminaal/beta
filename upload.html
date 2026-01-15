@@ -119,11 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const statusDiv = document.getElementById('status');
   const uploadBtn = document.getElementById('uploadBtn');
 
-  // Check auth on load
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  const user = userData?.user || null;
-
-  if (userErr || !user) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
     statusDiv.textContent = 'Please login first.';
     statusDiv.className = 'error';
     form.style.display = 'none';
@@ -132,71 +129,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-
+    
     const file = document.getElementById('imageFile').files[0];
-    const title = document.getElementById('title').value.trim();
-    const desc  = document.getElementById('desc').value.trim();
-
-    if (!file) {
-      showStatus('Select an image', 'error');
-      return;
-    }
+    if (!file) return showStatus('Select image', 'error');
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
-    showStatus('Uploading image...', 'uploading');
+    showStatus('Uploading to storage...', 'uploading');
 
     try {
-      // 1. Upload to Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-
+      // 1. STORAGE (con upsert para evitar conflictos)
+      const fileName = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('images')
-        .upload(fileName, file);
+        .upload(fileName, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) throw new Error(uploadError.message);
 
-      // 2. Get public URL
-      const { data: pub } = supabase.storage
-        .from('images')
-        .getPublicUrl(fileName);
+      // 2. URL pública
+      const { data: { publicUrl } } = supabase.storage.from('images').getPublicUrl(fileName);
 
-      const publicUrl = pub?.publicUrl;
-      if (!publicUrl) {
-        throw new Error('No public URL returned from storage');
-      }
+      // 3. Database
+      await supabase.from('images').insert({
+        url: publicUrl,
+        uploaded_by: user.id,
+        title: document.getElementById('title').value || null,
+        description: document.getElementById('desc').value || null
+      });
 
-      // 3. Insert into images table (siempre pending para cumplir RLS)
-      const { error: insertError } = await supabase
-        .from('images')
-        .insert({
-          url: publicUrl,
-          uploaded_by: user.id,
-          status: 'pending',
-          ...(title && { title }),
-          ...(desc && { description: desc })
-        });
-
-      if (insertError) throw insertError;
-
-      showStatus(
-        'Image uploaded as pending. Waiting for moderator approval.',
-        'success'
-      );
-
+      showStatus('✅ Uploaded!', 'success');
       form.reset();
     } catch (error) {
-      showStatus('Error: ' + (error.message || String(error)), 'error');
+      console.error('ERROR:', error);
+      showStatus('❌ ' + error.message, 'error');
     } finally {
       uploadBtn.disabled = false;
       uploadBtn.textContent = 'Upload';
     }
   });
 
-  function showStatus(message, type) {
-    statusDiv.textContent = message;
-    statusDiv.className = type;
+  function showStatus(msg, type) {
+    document.getElementById('status').textContent = msg;
+    document.getElementById('status').className = type;
   }
 });
 </script>
