@@ -103,110 +103,110 @@
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./supabase.js"></script>
   <script>
-    // Configuración de Supabase
-    const supabase = supabase.createClient(
-      "https://niqcvctwikiluztlhkqs.supabase.co",
-      "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt"
-    );
+document.addEventListener('DOMContentLoaded', async () => {
+  const form = document.getElementById('uploadForm');
+  const statusDiv = document.getElementById('status');
+  const uploadBtn = document.getElementById('uploadBtn');
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      const form = document.getElementById('uploadForm');
-      const statusDiv = document.getElementById('status');
-      const uploadBtn = document.getElementById('uploadBtn');
+  // Verificar sesión
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    statusDiv.textContent = 'Please login first.';
+    statusDiv.className = 'error';
+    form.style.display = 'none';
+    return;
+  }
 
-      // Verificar sesión
-      const {  { user } } = await supabase.auth.getUser();
-      if (!user) {
-        statusDiv.textContent = 'Please login first.';
-        statusDiv.className = 'error';
-        form.style.display = 'none';
-        return;
-      }
+  // Obtener rol del usuario desde profiles
+  let userRole = 'user';
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile) userRole = profile.role;
+  } catch (e) {
+    console.warn('Could not fetch role, defaulting to "user"');
+  }
 
-      // Obtener rol del usuario
-      let userRole = 'user';
-      try {
-        const {  profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        if (profile) userRole = profile.role;
-      } catch (e) {
-        console.warn('Could not fetch role, defaulting to "user"');
-      }
+  // Determinar estado según rol
+  const status = (userRole === 'owner' || userRole === 'admin') ? 'approved' : 'pending';
 
-      // Determinar estado según rol
-      const status = (userRole === 'owner' || userRole === 'admin') ? 'approved' : 'pending';
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); // ← Evita recarga
 
-      // Manejar el envío del formulario
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault(); // ←←← ¡ESTO EVITA LA RECARGA!
+    const fileInput = document.getElementById('imageFile');
+    const file = fileInput.files[0];
+    
+    if (!file) return showStatus('Select an image', 'error');
+    if (!file.type.startsWith('image/')) return showStatus('File must be an image', 'error');
+    if (file.size > 10 * 1024 * 1024) return showStatus('Image too large (max 10MB)', 'error');
 
-        const fileInput = document.getElementById('imageFile');
-        const file = fileInput.files[0];
-        
-        if (!file) return showStatus('Select an image', 'error');
-        if (!file.type.startsWith('image/')) return showStatus('File must be an image', 'error');
-        if (file.size > 10 * 1024 * 1024) return showStatus('Image too large (max 10MB)', 'error');
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+    showStatus('Uploading to storage...', 'uploading');
 
-        uploadBtn.disabled = true;
-        uploadBtn.textContent = 'Uploading...';
-        showStatus('Uploading to storage...', 'uploading');
+    try {
+      // Nombre seguro
+      const ext = file.name.split('.').pop().toLowerCase();
+      const safeName = file.name
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9.-]/gi, '')
+        .replace(/--+/g, '-');
+      
+      const fileName = `${Date.now()}-${safeName}`;
+      
+      // 1. Subir a Storage
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, file, { upsert: true });
 
-        try {
-          const ext = file.name.split('.').pop().toLowerCase();
-          const safeName = file.name
-            .replace(/\s+/g, '-')
-            .replace(/[^a-z0-9.-]/gi, '')
-            .replace(/--+/g, '-');
-          
-          const fileName = `${Date.now()}-${safeName}`;
-          
-          // Subir a Storage
-          const { error: uploadError } = await supabase.storage
-            .from('images')
-            .upload(fileName, file, { upsert: true });
+      if (uploadError) throw new Error(uploadError.message);
 
-          if (uploadError) throw new Error(uploadError.message);
+      // 2. Obtener URL pública
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName);
+      const publicUrl = data.publicUrl;
 
-          // Obtener URL pública
-          const { data } = supabase.storage.from('images').getPublicUrl(fileName);
-          const publicUrl = data.publicUrl;
+      if (!publicUrl) throw new Error('Failed to get public URL');
 
-          if (!publicUrl) throw new Error('Failed to get public URL');
+      // 3. Insertar en DB con uploaded_by y status
+      const { error: dbError } = await supabase
+        .from('images')
+        .insert({
+          url: publicUrl,
+          uploaded_by: user.id,      // ✅ ID del usuario
+          status: status,            // ✅ approved si admin/owner, sino pending
+          title: document.getElementById('title').value.trim() || null,
+          description: document.getElementById('desc').value.trim() || null
+        });
 
-          // Insertar en DB
-          const { error: dbError } = await supabase
-            .from('images')
-            .insert({
-              url: publicUrl,
-              uploaded_by: user.id,   // ✅ CORRECTO
-              status: status,         // ✅ APROBADO si es admin/owner
-              title: document.getElementById('title').value.trim() || null,
-              description: document.getElementById('desc').value.trim() || null
-            });
+      if (dbError) throw new Error(dbError.message);
 
-          if (dbError) throw new Error(dbError.message);
+      showStatus(
+        status === 'approved' 
+          ? '✅ Uploaded & published!' 
+          : '✅ Uploaded! (pending approval)',
+        'success'
+      );
+      form.reset();
+      fileInput.value = '';
+    } catch (error) {
+      console.error('Upload error:', error);
+      showStatus('❌ ' + (error.message || 'Unknown error'), 'error');
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload';
+    }
+  });
 
-          showStatus(status === 'approved' ? '✅ Uploaded & published!' : '✅ Uploaded! (pending approval)', 'success');
-          form.reset();
-          fileInput.value = '';
-        } catch (error) {
-          console.error('Upload error:', error);
-          showStatus('❌ ' + (error.message || 'Unknown error'), 'error');
-        } finally {
-          uploadBtn.disabled = false;
-          uploadBtn.textContent = 'Upload';
-        }
-      });
-
-      function showStatus(msg, type) {
-        statusDiv.textContent = msg;
-        statusDiv.className = type;
-      }
-    });
+  function showStatus(msg, type) {
+    statusDiv.textContent = msg;
+    statusDiv.className = type;
+  }
+});
   </script>
 </body>
 </html>
