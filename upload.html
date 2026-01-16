@@ -81,9 +81,18 @@
       text-align: center;
       font-weight: 500;
     }
-    .success { background: rgba(34,197,94,.2); color: #86efac; }
-    .error { background: rgba(239,68,68,.2); color: #fca5a5; }
-    .uploading { background: rgba(99,102,241,.2); color: #c7d2fe; }
+    .success {
+      background: rgba(34,197,94,.2);
+      color: #86efac;
+    }
+    .error {
+      background: rgba(239,68,68,.2);
+      color: #fca5a5;
+    }
+    .uploading {
+      background: rgba(99,102,241,.2);
+      color: #c7d2fe;
+    }
   </style>
 </head>
 <body>
@@ -101,15 +110,15 @@
     <div id="status"></div>
   </div>
 
-  <!-- Scripts ORDEN OBLIGATORIO -->
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js"></script>
   <script>
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('uploadForm');
   const statusDiv = document.getElementById('status');
   const uploadBtn = document.getElementById('uploadBtn');
 
+  // Verificar sesión
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     statusDiv.textContent = 'Please login first.';
@@ -118,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Obtener el rol del usuario
+  // Obtener rol del usuario
   let userRole = 'user';
   try {
     const { data: profile } = await supabase
@@ -131,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Could not fetch role, defaulting to "user"');
   }
 
-  // Determinar status según rol
+  // Determinar estado según rol
   const status = (userRole === 'owner' || userRole === 'admin') ? 'approved' : 'pending';
 
   form.addEventListener('submit', async (e) => {
@@ -149,6 +158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showStatus('Uploading to storage...', 'uploading');
 
     try {
+      // Generar nombre seguro
       const ext = file.name.split('.').pop().toLowerCase();
       const safeName = file.name
         .replace(/\s+/g, '-')
@@ -157,26 +167,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       const fileName = `${Date.now()}-${safeName}`;
       
-      // 1. Subir a Storage
+      // Subir a Storage
       const { error: uploadError } = await supabase.storage
         .from('images')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw new Error(uploadError.message);
 
-      // 2. Obtener URL pública
+      // Obtener URL pública
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       const publicUrl = data.publicUrl;
 
       if (!publicUrl) throw new Error('Failed to get public URL');
 
-      // 3. Insertar en DB — ¡con uploaded_by y status!
+      // Insertar en DB — ¡con uploaded_by y status!
       const { error: dbError } = await supabase
         .from('images')
         .insert({
           url: publicUrl,
-          uploaded_by: user.id,      // ✅ CORRECTO
-          status: status,            // ✅ APROBADO si es admin/owner
+          uploaded_by: user.id,      // ✅ Ahora sí, user.id está definido
+          status: status,
           title: document.getElementById('title').value.trim() || null,
           description: document.getElementById('desc').value.trim() || null
         });
@@ -200,6 +210,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusDiv.className = type;
   }
 });
-</script>
+  </script>
 </body>
 </html>
