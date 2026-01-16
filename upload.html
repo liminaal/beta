@@ -167,26 +167,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       const fileName = `${Date.now()}-${safeName}`;
       
-      // Subir a Storage
+      // 1. Subir a Storage
       const { error: uploadError } = await supabase.storage
         .from('images')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw new Error(uploadError.message);
 
-      // Obtener URL pública
+      // 2. Obtener URL pública
       const { data } = supabase.storage.from('images').getPublicUrl(fileName);
       const publicUrl = data.publicUrl;
 
       if (!publicUrl) throw new Error('Failed to get public URL');
 
-      // Insertar en DB — ¡con uploaded_by y status!
+      // 3. Insertar en DB — ¡con uploaded_by y status!
       const { error: dbError } = await supabase
         .from('images')
         .insert({
           url: publicUrl,
-          uploaded_by: user.id,      // ✅ Ahora sí, user.id está definido
-          status: status,
+          uploaded_by: user.id,      // ✅ CORRECTO — user.id está definido
+          status: status,            // ✅ APROBADO si es admin/owner
           title: document.getElementById('title').value.trim() || null,
           description: document.getElementById('desc').value.trim() || null
         });
