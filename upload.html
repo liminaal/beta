@@ -81,18 +81,9 @@
       text-align: center;
       font-weight: 500;
     }
-    .success {
-      background: rgba(34,197,94,.2);
-      color: #86efac;
-    }
-    .error {
-      background: rgba(239,68,68,.2);
-      color: #fca5a5;
-    }
-    .uploading {
-      background: rgba(99,102,241,.2);
-      color: #c7d2fe;
-    }
+    .success { background: rgba(34,197,94,.2); color: #86efac; }
+    .error { background: rgba(239,68,68,.2); color: #fca5a5; }
+    .uploading { background: rgba(99,102,241,.2); color: #c7d2fe; }
   </style>
 </head>
 <body>
@@ -127,6 +118,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  // Obtener el rol del usuario
+  let userRole = 'user';
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile) userRole = profile.role;
+  } catch (e) {
+    console.warn('Could not fetch role, defaulting to "user"');
+  }
+
+  // Determinar status según rol
+  const status = (userRole === 'owner' || userRole === 'admin') ? 'approved' : 'pending';
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -134,28 +141,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const file = fileInput.files[0];
     
     if (!file) return showStatus('Select an image', 'error');
-    
-    // Validar tipo de imagen
-    if (!file.type.startsWith('image/')) {
-      return showStatus('File must be an image', 'error');
-    }
-
-    // Limitar tamaño (opcional, ej. 10 MB)
-    if (file.size > 10 * 1024 * 1024) {
-      return showStatus('Image too large (max 10MB)', 'error');
-    }
+    if (!file.type.startsWith('image/')) return showStatus('File must be an image', 'error');
+    if (file.size > 10 * 1024 * 1024) return showStatus('Image too large (max 10MB)', 'error');
 
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
     showStatus('Uploading to storage...', 'uploading');
 
     try {
-      // Nombre seguro para el archivo
       const ext = file.name.split('.').pop().toLowerCase();
       const safeName = file.name
-        .replace(/\s+/g, '-')     // espacios → guiones
-        .replace(/[^a-z0-9.-]/gi, '') // solo alfanum, puntos, guiones
-        .replace(/--+/g, '-');    // evitar guiones dobles
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9.-]/gi, '')
+        .replace(/--+/g, '-');
       
       const fileName = `${Date.now()}-${safeName}`;
       
@@ -172,21 +170,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (!publicUrl) throw new Error('Failed to get public URL');
 
-      // 3. Insertar en DB — ¡USAR user_id!
+      // 3. Insertar en DB — ¡con uploaded_by y status!
       const { error: dbError } = await supabase
         .from('images')
         .insert({
           url: publicUrl,
-          user_id: user.id,  // ← ¡CORRECTO!
+          uploaded_by: user.id,      // ✅ CORRECTO
+          status: status,            // ✅ APROBADO si es admin/owner
           title: document.getElementById('title').value.trim() || null,
           description: document.getElementById('desc').value.trim() || null
         });
 
       if (dbError) throw new Error(dbError.message);
 
-      showStatus('✅ Uploaded!', 'success');
+      showStatus(status === 'approved' ? '✅ Uploaded & published!' : '✅ Uploaded! (pending approval)', 'success');
       form.reset();
-      fileInput.value = ''; // resetear input de archivo
+      fileInput.value = '';
     } catch (error) {
       console.error('Upload error:', error);
       showStatus('❌ ' + (error.message || 'Unknown error'), 'error');
