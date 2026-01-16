@@ -100,6 +100,50 @@ iframe{border-radius:12px}
 .image-box:hover img.thumb{transform:scale(1.08) translateY(-6px);filter:none}
 .image-box:hover .meta{transform:translateY(0)}
 
+/* LIKE BUTTON */
+.image-box .like-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #f5f5f5;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+}
+.image-box:hover .like-btn {
+  opacity: 1;
+}
+.like-btn .heart-icon {
+  transition: 
+    color 0.3s ease,
+    transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: block;
+}
+.like-btn.liked .heart-icon {
+  color: #ff6b9d;
+  transform: scale(1.2);
+}
+@keyframes likePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1.2); }
+}
+.like-btn.liked .heart-icon.animate {
+  animation: likePulse 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
 /* Hover preview (floating) for gallery items only */
 .hover-preview{
   position:fixed;pointer-events:none;z-index:12000;display:flex;gap:12px;align-items:flex-start;
@@ -167,6 +211,7 @@ iframe{border-radius:12px}
   .hover-preview{display:none}
   .collaborators{gap:.6rem}
   .collaborator{width:46%;min-width:140px}
+  .like-btn { top: 8px; right: 8px; width: 30px; height: 30px; font-size: 18px; }
 }
 
 /* AUTH BOX STYLING */
@@ -245,29 +290,6 @@ iframe{border-radius:12px}
   box-shadow:0 18px 45px rgba(0,0,0,0.85);
   filter:brightness(1.03);
 }
-  /* Admin Panel */
-#admin-panel{
-  margin:1.2rem auto 1rem;
-  display:flex;
-  justify-content:center;
-}
-#admin-panel button{
-  font-family:'Unbounded',sans-serif;
-  background:rgba(255,99,132,0.3);
-  color:var(--fg);
-  border:none;
-  padding:10px 20px;
-  border-radius:999px;
-  font-size:.84rem;
-  cursor:pointer;
-  letter-spacing:0.04em;
-  text-transform:lowercase;
-  transition:background .2s, transform .15s;
-}
-#admin-panel button:hover{
-  background:rgba(255,99,132,0.5);
-  transform:translateY(-1px);
-}
 </style>
 </head>
   
@@ -304,28 +326,7 @@ iframe{border-radius:12px}
   </div>
 
   <div class="image-placeholder" id="image-placeholder">
-    <!-- TUS 4 IMÁGENES ORIGINALES (siempre arriba) -->
-    <div class="image-box" data-title="Abandoned Hospital" data-desc="Abandoned hospital found..." data-img="/assets/images/hospital.png">
-      <img class="thumb" src="/assets/images/hospital.png" alt="Abandoned Hospital" loading="lazy" decoding="async">
-      <div class="meta"><div class="title">Abandoned Hospital</div><div class="sub">found - november 2025</div></div>
-    </div>
-
-    <div class="image-box" data-title="Cold Loneliness" data-desc="Cold halls and colder hearts." data-img="/assets/images/cold-loneliness.jpg">
-      <img class="thumb" src="/assets/images/cold-loneliness.jpg" alt="Cold Loneliness" loading="lazy" decoding="async">
-      <div class="meta"><div class="title">Cold Loneliness</div><div class="sub">somewhere inside</div></div>
-    </div>
-
-    <div class="image-box" data-title="Oppressive Cells" data-desc="Cells full of silence." data-img="/assets/images/oppressive-cells.jpg">
-      <img class="thumb" src="/assets/images/oppressive-cells.jpg" alt="Oppressive Cells" loading="lazy" decoding="async">
-      <div class="meta"><div class="title">Oppressive Cells</div><div class="sub">locked memories</div></div>
-    </div>
-
-    <div class="image-box" data-title="???" data-desc="???" data-img="/assets/images/unknown.png">
-      <img class="thumb" src="/assets/images/unknown.png" alt="???" loading="lazy" decoding="async">
-      <div class="meta"><div class="title">???</div><div class="sub">???</div></div>
-    </div>
-
-    <!-- AQUÍ VAN LAS SUBIDAS (se llenan con JS) -->
+    <!-- AQUÍ VAN TODAS LAS IMÁGENES (se llenan con JS) -->
   </div>
 
   <!-- Collaborators Section -->
@@ -406,27 +407,6 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
     SUPABASE_ANON_KEY
   );
 </script>
-<script>
-// Admin panel para mods/owner
-(async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role === 'mod' || profile?.role === 'owner') {
-    document.getElementById('admin-panel').style.display = 'flex';
-    
-    document.getElementById('adminDeleteBtn').onclick = () => {
-      window.location.href = 'admin.html';
-    };
-  }
-})();
-</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -454,19 +434,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return base + '@2x.' + ext;
   }
 
-  const boxes = document.querySelectorAll('.image-box');
-  const hoverPreview = document.getElementById('hoverPreview');
-  const previewThumb = document.getElementById('previewThumb');
-  const previewTitle = document.getElementById('previewTitle');
-  const previewDesc = document.getElementById('previewDesc');
-
-  const popup = document.getElementById('popup');
-  const popupImg = document.getElementById('popup-img');
-  const popupTitle = document.getElementById('popup-title');
-  const popupDesc = document.getElementById('popup-desc');
-  const popupClose = document.getElementById('popup-close');
-
-  boxes.forEach(box => {
+  // Reusable event setup for all image boxes
+  function attachImageEvents(box) {
     let showTimer = null;
 
     function positionPreview(x, y){
@@ -516,8 +485,20 @@ document.addEventListener('DOMContentLoaded', () => {
       popup.setAttribute('aria-hidden','false');
       document.body.style.overflow = 'hidden';
     });
-  });
+  }
 
+  // Initial boxes (none hardcoded)
+  const hoverPreview = document.getElementById('hoverPreview');
+  const previewThumb = document.getElementById('previewThumb');
+  const previewTitle = document.getElementById('previewTitle');
+  const previewDesc = document.getElementById('previewDesc');
+  const popup = document.getElementById('popup');
+  const popupImg = document.getElementById('popup-img');
+  const popupTitle = document.getElementById('popup-title');
+  const popupDesc = document.getElementById('popup-desc');
+  const popupClose = document.getElementById('popup-close');
+
+  // Popup close
   function closePopup(){
     popup.classList.remove('active');
     popup.setAttribute('aria-hidden','true');
@@ -528,6 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
   popupClose.addEventListener('click', closePopup);
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && popup.classList.contains('active')) closePopup(); });
 
+  // Touch devices
   function isTouch(){
     return ( 'ontouchstart' in window ) || navigator.maxTouchPoints > 0;
   }
@@ -535,6 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hoverPreview.style.display = 'none';
   }
 
+  // Collaborators
   const collaborators = document.querySelectorAll('.collaborator');
   const popupCollab = document.getElementById('popup-collab');
   const popupCollabImg = document.getElementById('popup-collab-img');
@@ -578,7 +561,6 @@ document.addEventListener('DOMContentLoaded', () => {
   popupCollab.addEventListener('click', e => { if(e.target === popupCollab) closeCollabPopup(); });
   popupCollabClose.addEventListener('click', closeCollabPopup);
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && popupCollab.classList.contains('active')) closeCollabPopup(); });
-
 });
 </script>
 
@@ -611,11 +593,10 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 </script>
 
-<!-- ✅ SCRIPT ACTUALIZADO: AUTENTICACIÓN + CARGA DE IMÁGENES COMUNITARIAS -->
+<!-- ✅ MAIN SCRIPT: AUTH + LOAD IMAGES + LIKES -->
 <script>
 (async () => {
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  const {  { user } } = await supabase.auth.getUser();
   const authBox = document.getElementById("auth-box");
   const uploadCta = document.getElementById("upload-cta");
 
@@ -638,72 +619,122 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // CARGAR IMÁGENES SUBIDAS
+  // Load ALL images from database (including your 4 originals)
   try {
-    const { data: images } = await supabase
+    const {  images } = await supabase
       .from('images')
-      .select('url, title, description, created_at')
+      .select('id, url, title, description, created_at')
       .order('created_at', { ascending: false })
       .limit(12);
 
-    if (images && images.length > 0) {
-      const container = document.getElementById('image-placeholder');
+    if (!images || images.length === 0) return;
+
+    // Fetch like counts and user likes in parallel
+    const enriched = await Promise.all(images.map(async (img) => {
+      // Like count
+      const {  count } = await supabase
+        .from('likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('image_id', img.id);
+
+      // Did current user like it?
+      let userLiked = false;
+      if (user) {
+        const {  like } = await supabase
+          .from('likes')
+          .select('id')
+          .eq('image_id', img.id)
+          .eq('user_id', user.id)
+          .single();
+        userLiked = !!like;
+      }
+
+      return { ...img, likeCount: count || 0, userLiked };
+    }));
+
+    const container = document.getElementById('image-placeholder');
+    
+    enriched.slice(0, 8).forEach(img => {
+      const box = document.createElement('div');
+      box.className = 'image-box';
+      box.dataset.title = img.title || 'community upload';
+      box.dataset.desc = img.description || 'liminaal';
+      box.dataset.img = img.url;
+      box.dataset.imageId = img.id; // ← important!
       
-      images.slice(0, 8).forEach(img => {  // Solo 8 primeras
-        const box = document.createElement('div');
-        box.className = 'image-box';
-        box.dataset.title = img.title || 'community upload';
-        box.dataset.desc = img.description || 'liminaal';
-        box.dataset.img = img.url;
-        
-        box.innerHTML = `
-          <img class="thumb" src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
-          <div class="meta">
-            <div class="title">${img.title || 'community'}</div>
-            <div class="sub">${new Date(img.created_at).toLocaleDateString('en-CA', { 
-              month: 'short', 
-              year: 'numeric' 
-            })}</div>
+      const likeCountText = img.likeCount > 0 ? `<span class="likes">• ${img.likeCount} ❤️</span>` : '';
+      const likedClass = img.userLiked ? 'liked' : '';
+      const heartIcon = img.userLiked ? '❤️' : '🤍';
+
+      box.innerHTML = `
+        <button class="like-btn ${likedClass}" onclick="toggleLike(event, '${img.id}', this)">
+          <span class="heart-icon">${heartIcon}</span>
+        </button>
+        <img class="thumb" src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
+        <div class="meta">
+          <div class="title">${img.title || 'community'}</div>
+          <div class="sub">
+            ${new Date(img.created_at).toLocaleDateString('en-CA', { month: 'short', year: 'numeric' })}
+            ${likeCountText}
           </div>
-        `;
-        
-        container.appendChild(box);
-        
-        // Event listeners para hover/popup (igual que las originales)
-        box.addEventListener('mouseenter', e => {
-          const hoverPreview = document.getElementById('hoverPreview');
-          const previewThumb = document.getElementById('previewThumb');
-          const previewTitle = document.getElementById('previewTitle');
-          const previewDesc = document.getElementById('previewDesc');
-          
-          previewThumb.src = img.url;
-          previewTitle.textContent = box.dataset.title;
-          previewDesc.textContent = box.dataset.desc;
-          hoverPreview.classList.add('active');
-        });
-        
-        box.addEventListener('mouseleave', () => {
-          document.getElementById('hoverPreview').classList.remove('active');
-        });
-        
-        box.addEventListener('click', () => {
-          const popup = document.getElementById('popup');
-          const popupImg = document.getElementById('popup-img');
-          const popupTitle = document.getElementById('popup-title');
-          const popupDesc = document.getElementById('popup-desc');
-          
-          popupImg.src = img.url;
-          popupTitle.textContent = box.dataset.title;
-          popupDesc.textContent = box.dataset.desc;
-          popup.classList.add('active');
-          document.body.style.overflow = 'hidden';
-        });
-      });
-    }
+        </div>
+      `;
+      
+      container.appendChild(box);
+      attachImageEvents(box); // from DOMContentLoaded
+    });
   } catch (e) {
-    console.log('No images yet');
+    console.log('No community images yet');
   }
 })();
+
+// LIKE TOGGLE FUNCTION
+async function toggleLike(event, imageId, button) {
+  event.stopPropagation();
+  
+  const {  { user } } = await supabase.auth.getUser();
+  if (!user) {
+    alert('Please log in to like images.');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  const isLiked = button.classList.contains('liked');
+  const icon = button.querySelector('.heart-icon');
+
+  try {
+    if (isLiked) {
+      // Unlike
+      await supabase
+        .from('likes')
+        .delete()
+        .eq('image_id', imageId)
+        .eq('user_id', user.id);
+      button.classList.remove('liked');
+      icon.textContent = '🤍';
+    } else {
+      // Like
+      await supabase
+        .from('likes')
+        .insert({ image_id: imageId, user_id: user.id });
+      button.classList.add('liked');
+      icon.textContent = '❤️';
+      icon.classList.add('animate');
+      setTimeout(() => icon.classList.remove('animate'), 400);
+    }
+
+    // Update count
+    const countSpan = button.closest('.image-box').querySelector('.sub .likes');
+    if (countSpan) {
+      let count = parseInt(countSpan.textContent.match(/\d+/)?.[0] || '0') || 0;
+      count = isLiked ? Math.max(0, count - 1) : count + 1;
+      countSpan.textContent = count > 0 ? `• ${count} ❤️` : '';
+    }
+  } catch (error) {
+    console.error('Like error:', error);
+    alert('Failed to update like.');
+  }
+}
 </script>
 </body>
 </html>
