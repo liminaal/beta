@@ -100,50 +100,6 @@ iframe{border-radius:12px}
 .image-box:hover img.thumb{transform:scale(1.08) translateY(-6px);filter:none}
 .image-box:hover .meta{transform:translateY(0)}
 
-/* LIKE BUTTON */
-.image-box .like-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #f5f5f5;
-  font-size: 20px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  outline: none;
-}
-.image-box:hover .like-btn {
-  opacity: 1;
-}
-.like-btn .heart-icon {
-  transition: 
-    color 0.3s ease,
-    transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  display: block;
-}
-.like-btn.liked .heart-icon {
-  color: #ff6b9d;
-  transform: scale(1.2);
-}
-@keyframes likePulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1.2); }
-}
-.like-btn.liked .heart-icon.animate {
-  animation: likePulse 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
 /* Hover preview (floating) for gallery items only */
 .hover-preview{
   position:fixed;pointer-events:none;z-index:12000;display:flex;gap:12px;align-items:flex-start;
@@ -171,6 +127,49 @@ iframe{border-radius:12px}
 .popup-content{background:linear-gradient(180deg,rgba(20,20,20,.97),rgba(8,8,8,.99));padding:18px;text-align:center;color:var(--fg)}
 .popup-content img{width:100%;height:auto;max-height:70vh;object-fit:contain;filter:none}
 .popup-close{position:absolute;top:18px;right:20px;background:rgba(255,255,255,.03);border:none;color:var(--fg);padding:8px 10px;border-radius:8px;cursor:pointer}
+
+/* LIKE BUTTON INSIDE POPUP */
+.popup-content .like-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.popup-content .like-btn {
+  background: none;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #f5f5f5;
+  font-size: 22px;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+}
+.popup-content .like-btn.liked {
+  color: #ff6b9d;
+  transform: scale(1.2);
+}
+.popup-content .like-btn.liked .heart-icon.animate {
+  animation: likePulse 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+@keyframes likePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1.2); }
+}
+.popup-content .like-count {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
 
 /* Collaborators section — more space between gallery and collabs */
 .collab-wrap{margin-top:4rem}
@@ -211,7 +210,6 @@ iframe{border-radius:12px}
   .hover-preview{display:none}
   .collaborators{gap:.6rem}
   .collaborator{width:46%;min-width:140px}
-  .like-btn { top: 8px; right: 8px; width: 30px; height: 30px; font-size: 18px; }
 }
 
 /* AUTH BOX STYLING */
@@ -376,6 +374,13 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
       <div class="imgwrap"><img src="" alt="Popup Image" id="popup-img"></div>
       <h3 id="popup-title"></h3>
       <p id="popup-desc"></p>
+      <!-- LIKE SECTION ADDED HERE -->
+      <div class="like-section">
+        <button class="like-btn" onclick="toggleLikeInPopup(event)">
+          <span class="heart-icon">🤍</span>
+        </button>
+        <span class="like-count">0 ❤️</span>
+      </div>
     </div>
   </div>
 </div>
@@ -474,13 +479,20 @@ document.addEventListener('DOMContentLoaded', () => {
       hoverPreview.setAttribute('aria-hidden','true');
     });
 
-    box.addEventListener('click', () => {
+    box.addEventListener('click', async () => {
       const imgPath = box.dataset.img || box.querySelector('img.thumb')?.src || '';
       const candidate = highResPath(imgPath);
       popupImg.src = candidate;
       popupImg.onerror = () => { popupImg.onerror = null; popupImg.src = imgPath; };
       popupTitle.textContent = box.dataset.title || '';
       popupDesc.textContent = box.dataset.desc || '';
+
+      // Set image ID for like system
+      popup.dataset.imageId = box.dataset.imageId;
+
+      // Load like state and count
+      await loadLikeStateForPopup(box.dataset.imageId);
+
       popup.classList.add('active');
       popup.setAttribute('aria-hidden','false');
       document.body.style.overflow = 'hidden';
@@ -662,21 +674,11 @@ document.addEventListener('DOMContentLoaded', () => {
       box.dataset.img = img.url;
       box.dataset.imageId = img.id; // ← important!
       
-      const likeCountText = img.likeCount > 0 ? `<span class="likes">• ${img.likeCount} ❤️</span>` : '';
-      const likedClass = img.userLiked ? 'liked' : '';
-      const heartIcon = img.userLiked ? '❤️' : '🤍';
-
       box.innerHTML = `
-        <button class="like-btn ${likedClass}" onclick="toggleLike(event, '${img.id}', this)">
-          <span class="heart-icon">${heartIcon}</span>
-        </button>
         <img class="thumb" src="${img.url}" alt="${img.title || 'Image'}" loading="lazy">
         <div class="meta">
           <div class="title">${img.title || 'community'}</div>
-          <div class="sub">
-            ${new Date(img.created_at).toLocaleDateString('en-CA', { month: 'short', year: 'numeric' })}
-            ${likeCountText}
-          </div>
+          <div class="sub">${new Date(img.created_at).toLocaleDateString('en-CA', { month: 'short', year: 'numeric' })}</div>
         </div>
       `;
       
@@ -688,8 +690,56 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 })();
 
-// LIKE TOGGLE FUNCTION
-async function toggleLike(event, imageId, button) {
+// Global variables for popup like state
+let currentPopupImageId = null;
+let currentUserLiked = false;
+
+// Load like state for popup
+async function loadLikeStateForPopup(imageId) {
+  currentPopupImageId = imageId;
+  const {  { user } } = await supabase.auth.getUser();
+
+  // Reset state
+  currentUserLiked = false;
+  const likeBtn = document.querySelector('.popup-content .like-btn');
+  const heartIcon = likeBtn.querySelector('.heart-icon');
+  const countSpan = document.querySelector('.popup-content .like-count');
+
+  if (!user) {
+    likeBtn.disabled = true;
+    likeBtn.style.opacity = 0.5;
+    heartIcon.textContent = '🤍';
+    countSpan.textContent = '0 ❤️';
+    return;
+  }
+
+  // Get like count
+  const {  count } = await supabase
+    .from('likes')
+    .select('*', { count: 'exact', head: true })
+    .eq('image_id', imageId);
+
+  // Check if user liked it
+  const {  like } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('image_id', imageId)
+    .eq('user_id', user.id)
+    .single();
+
+  currentUserLiked = !!like;
+  heartIcon.textContent = currentUserLiked ? '❤️' : '🤍';
+  countSpan.textContent = `${count || 0} ❤️`;
+
+  if (currentUserLiked) {
+    likeBtn.classList.add('liked');
+  } else {
+    likeBtn.classList.remove('liked');
+  }
+}
+
+// TOGGLE LIKE IN POPUP
+async function toggleLikeInPopup(event) {
   event.stopPropagation();
   
   const {  { user } } = await supabase.auth.getUser();
@@ -699,37 +749,42 @@ async function toggleLike(event, imageId, button) {
     return;
   }
 
-  const isLiked = button.classList.contains('liked');
-  const icon = button.querySelector('.heart-icon');
+  if (!currentPopupImageId) return;
+
+  const likeBtn = document.querySelector('.popup-content .like-btn');
+  const heartIcon = likeBtn.querySelector('.heart-icon');
+  const countSpan = document.querySelector('.popup-content .like-count');
 
   try {
-    if (isLiked) {
+    if (currentUserLiked) {
       // Unlike
       await supabase
         .from('likes')
         .delete()
-        .eq('image_id', imageId)
+        .eq('image_id', currentPopupImageId)
         .eq('user_id', user.id);
-      button.classList.remove('liked');
-      icon.textContent = '🤍';
+      currentUserLiked = false;
+      heartIcon.textContent = '🤍';
+      likeBtn.classList.remove('liked');
     } else {
       // Like
       await supabase
         .from('likes')
-        .insert({ image_id: imageId, user_id: user.id });
-      button.classList.add('liked');
-      icon.textContent = '❤️';
-      icon.classList.add('animate');
-      setTimeout(() => icon.classList.remove('animate'), 400);
+        .insert({ image_id: currentPopupImageId, user_id: user.id });
+      currentUserLiked = true;
+      heartIcon.textContent = '❤️';
+      likeBtn.classList.add('liked');
+      heartIcon.classList.add('animate');
+      setTimeout(() => heartIcon.classList.remove('animate'), 400);
     }
 
     // Update count
-    const countSpan = button.closest('.image-box').querySelector('.sub .likes');
-    if (countSpan) {
-      let count = parseInt(countSpan.textContent.match(/\d+/)?.[0] || '0') || 0;
-      count = isLiked ? Math.max(0, count - 1) : count + 1;
-      countSpan.textContent = count > 0 ? `• ${count} ❤️` : '';
-    }
+    const {  count } = await supabase
+      .from('likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('image_id', currentPopupImageId);
+
+    countSpan.textContent = `${count || 0} ❤️`;
   } catch (error) {
     console.error('Like error:', error);
     alert('Failed to update like.');
