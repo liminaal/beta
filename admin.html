@@ -28,19 +28,25 @@
 <body>
   <div class="container">
     <a href="index.html" class="back-link">← back to liminaal</a>
-    <h1>Admin Panel</h1>
+    <h1>admin panel</h1>
     
     <div id="loading" class="loader">loading images...</div>
     <div id="admin-grid" class="admin-grid" style="display:none;"></div>
     <div id="empty-state" class="empty-state" style="display:none;">no images yet</div>
   </div>
 
+  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js"></script>
+  <!-- Your supabase.js (with client init) -->
+  <script src="supabase.js?v=1.1"></script>
+
   <script>
-    const SUPABASE_URL = "https://niqcvctwikiluztlhkqs.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
-    window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Initialize Supabase if not already done
+    if (!window.supabase) {
+      const SUPABASE_URL = "https://niqcvctwikiluztlhkqs.supabase.co";
+      const SUPABASE_ANON_KEY = "sb_publishable_98Kubj2Lfs9OV6Oj-EsrHQ_O2vszXUt";
+      window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
 
     async function deleteImage(imageId, imageUrl) {
       if (!confirm('⚠️ ¿Borrar esta imagen permanentemente?\n(Esta acción no se puede deshacer)')) return;
@@ -62,45 +68,41 @@
     }
 
     (async () => {
-      // 🔒 Verificación estricta de autenticación y rol
+      // 🔒 STEP 1: Check if user is logged in
       const {  { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        console.log("No authenticated user → redirecting to ./");
+        console.log("No user → redirecting to ./");
         window.location.href = './';
         return;
       }
 
-      const {  { profile }, error } = await supabase
+      // 🔒 STEP 2: Fetch profile
+      const {  { profile } } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
 
-      if (error || !profile || !profile.role) {
-        console.warn("Profile not found or invalid → redirecting to ./", { error, profile });
+      // 🔒 STEP 3: Redirect if no profile or role not allowed
+      if (!profile || !['mod', 'owner'].includes(profile.role)) {
+        console.log("Unauthorized role or missing profile → redirecting to ./");
         window.location.href = './';
         return;
       }
 
-      if (!['mod', 'owner'].includes(profile.role)) {
-        console.log("User role not authorized:", profile.role, "→ redirecting to ./");
-        window.location.href = './';
-        return;
-      }
-
-      // ✅ Usuario autorizado: cargar imágenes
+      // ✅ Authorized: load images
       const loading = document.getElementById('loading');
       const grid = document.getElementById('admin-grid');
       const empty = document.getElementById('empty-state');
 
       try {
-        const {  images, error: fetchError } = await supabase
+        const {  images, error } = await supabase
           .from('images')
           .select('id, url, title, description, user_id, created_at')
           .order('created_at', { ascending: false });
 
-        if (fetchError) throw fetchError;
+        if (error) throw error;
 
         loading.style.display = 'none';
 
@@ -129,10 +131,19 @@
         });
       } catch (err) {
         console.error("Failed to load admin panel:", err);
-        alert('❌ Error al cargar el panel de administración');
+        alert('❌ Error loading admin panel');
         window.location.href = './';
       }
     })();
+
+    // 🔒 SAFETY: If after 3s nothing loaded, redirect
+    setTimeout(() => {
+      if (!document.querySelector('.image-card') && 
+          document.getElementById('loading').style.display !== 'none') {
+        console.warn("Timeout: redirecting to ./");
+        window.location.href = './';
+      }
+    }, 3000);
   </script>
 </body>
 </html>
