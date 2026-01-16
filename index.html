@@ -222,7 +222,7 @@ iframe{border-radius:12px}
   background:rgba(255,99,132,0.32);
 }
 
-/* Upload CTA, only shown when logged in */
+/* Upload CTA */
 #upload-cta{
   margin:1.2rem auto 0;
   display:flex;
@@ -251,7 +251,9 @@ iframe{border-radius:12px}
 #like-section {
   margin-top: 16px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 #like-section button {
   background: none;
@@ -259,6 +261,10 @@ iframe{border-radius:12px}
   cursor: pointer;
   outline: none;
   transition: transform 0.2s ease;
+}
+.like-count {
+  font-size: 0.9rem;
+  opacity: 0.8;
 }
 </style>
 </head>
@@ -350,7 +356,7 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
   </div>
 </div>
 
-<!-- hover preview element (gallery only) -->
+<!-- hover preview element -->
 <div class="hover-preview" id="hoverPreview" aria-hidden="true">
   <div class="preview-thumb"><img id="previewThumb" src="" alt=""></div>
   <div class="preview-meta">
@@ -367,7 +373,7 @@ he started when he was 11 y/o creating a Minecraft bot, then started taking ambi
       <div class="imgwrap"><img src="" alt="Popup Image" id="popup-img"></div>
       <h3 id="popup-title"></h3>
       <p id="popup-desc"></p>
-      <!-- LIKE BUTTON (ONLY FOR COMMUNITY) -->
+      <!-- LIKE BUTTON + COUNTER (ONLY FOR COMMUNITY) -->
       <div id="like-section"></div>
     </div>
   </div>
@@ -421,7 +427,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return data.length > 0;
   }
 
-  async function toggleLike(imageId, btn) {
+  async function getLikeCount(imageId) {
+    const { count } = await supabase.from('likes').select('*', { count: 'exact', head: true }).eq('image_id', imageId);
+    return count || 0;
+  }
+
+  async function toggleLike(imageId, btn, countEl) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       alert("You must be logged in to like.");
@@ -439,19 +450,33 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.innerHTML = createHeartSVG(true);
       setTimeout(() => btn.style.transform = 'scale(1)', 200);
     }
+
+    // Update count
+    const newCount = await getLikeCount(imageId);
+    countEl.textContent = `${newCount} like${newCount !== 1 ? 's' : ''}`;
   }
 
   function setupLikeButton(imageId) {
     const likeSection = document.getElementById('like-section');
-    likeSection.innerHTML = `<button>${createHeartSVG(false)}</button>`;
+    likeSection.innerHTML = `
+      <button>${createHeartSVG(false)}</button>
+      <div class="like-count">loading...</div>
+    `;
     const btn = likeSection.querySelector('button');
+    const countEl = likeSection.querySelector('.like-count');
+
+    // Set initial state
+    checkIfLiked(imageId).then(isLiked => {
+      btn.innerHTML = createHeartSVG(isLiked);
+    });
+    getLikeCount(imageId).then(count => {
+      countEl.textContent = `${count} like${count !== 1 ? 's' : ''}`;
+    });
+
     btn.onclick = (e) => {
       e.stopPropagation();
-      toggleLike(imageId, btn);
+      toggleLike(imageId, btn, countEl);
     };
-    checkIfLiked(imageId).then(isLiked => {
-      if (isLiked) btn.innerHTML = createHeartSVG(true);
-    });
   }
 
   // === POPUP HANDLING ===
@@ -504,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // === HOVER PREVIEW (GALLERY + COMMUNITY) ===
+  // === HOVER PREVIEW ===
   const hoverPreview = document.getElementById('hoverPreview');
   const previewThumb = document.getElementById('previewThumb');
   const previewTitle = document.getElementById('previewTitle');
