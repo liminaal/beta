@@ -59,13 +59,10 @@
 <body>
   <div class="box">
     <h2>Upload to Community</h2>
-    <p>Submit eerie, liminal, or ambient images.</p>
-    
     <form id="uploadForm">
       <input type="file" id="imageFile" accept="image/*" required />
       <button type="submit" id="uploadBtn">Upload</button>
     </form>
-
     <div class="status" id="status"></div>
     <a href="./index.html" class="back">← Back to gallery</a>
   </div>
@@ -76,16 +73,15 @@
   <script>
     let currentUser = null;
 
-    // Check if user is logged in
+    // Check auth
     (async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        alert("You must be logged in to upload.");
+        alert("You must be logged in.");
         window.location.href = "./login.html";
         return;
       }
       currentUser = data.user;
-      document.querySelector('h2').textContent += ` (${currentUser.email})`;
     })();
 
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
@@ -106,8 +102,8 @@
         btn.disabled = true;
         statusEl.textContent = "Uploading...";
 
-        // Get user's role from profiles
-        const { data: profile, error: profileErr } = await supabase
+        // Get user role
+        const {  profile, error: profileErr } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', currentUser.id)
@@ -115,12 +111,13 @@
 
         if (profileErr || !profile) throw new Error("Profile not found");
 
-        // Set status based on role
         const status = (profile.role === 'admin' || profile.role === 'owner') 
           ? 'approved' 
           : 'pending';
 
-        // Upload to Supabase Storage
+        console.log("User role:", profile.role, "→ status:", status); // 🔍 DEBUG
+
+        // Upload to Storage
         const fileName = `${Date.now()}-${file.name}`;
         const { error: uploadErr } = await supabase.storage
           .from('community')
@@ -128,8 +125,7 @@
 
         if (uploadErr) throw uploadErr;
 
-        // Get public URL
-        const { data: publicUrlData } = supabase.storage
+        const {  publicUrlData } = supabase.storage
           .from('community')
           .getPublicUrl(`uploads/${fileName}`);
 
@@ -144,20 +140,21 @@
             status
           });
 
-        if (dbErr) throw dbErr;
+        if (dbErr) {
+          console.error("DB insert failed:", dbErr);
+          throw dbErr;
+        }
 
         statusEl.innerHTML = status === 'approved'
-          ? "✅ Uploaded and published!"
+          ? "✅ Published!"
           : "✅ Uploaded! Awaiting approval.";
 
         fileInput.value = '';
-        setTimeout(() => {
-          window.location.href = './index.html';
-        }, 2000);
+        setTimeout(() => window.location.href = './index.html', 2000);
 
       } catch (err) {
-        console.error(err);
-        statusEl.textContent = "❌ Error: " + (err.message || 'Upload failed');
+        console.error("Full error:", err);
+        statusEl.textContent = "❌ " + (err.message || 'Upload failed');
         btn.disabled = false;
       }
     });
