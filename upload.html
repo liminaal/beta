@@ -6,161 +6,105 @@
   <title>Upload · liminaal</title>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      background:#050505;
-      color:#f5f5f5;
-      font-family:'Unbounded',sans-serif;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      min-height:100vh;
-      margin:0;
-    }
-    .box {
-      width:90%;
-      max-width:500px;
-      padding:30px;
-      background:rgba(10,10,10,0.7);
-      border-radius:12px;
-      text-align:center;
-    }
-    input[type="file"] {
-      width:100%;
-      margin:16px 0;
-      padding:10px;
-      background:rgba(255,255,255,0.06);
-      border:none;
-      border-radius:6px;
-      color:#f5f5f5;
-    }
-    button {
-      width:100%;
-      padding:12px;
-      background:#f5f5f5;
-      color:#050505;
-      border:none;
-      border-radius:6px;
-      font-weight:bold;
-      cursor:pointer;
-    }
-    .status {
-      margin-top:16px;
-      font-size:0.9rem;
-      opacity:0.8;
-    }
-    a.back {
-      display:inline-block;
-      margin-top:16px;
-      color:#f5f5f5;
-      text-decoration:underline;
-    }
+    body { background:#050505; color:#f5f5f5; font-family:'Unbounded',sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+    .box { width:90%; max-width:500px; padding:30px; background:rgba(10,10,10,0.7); border-radius:12px; text-align:center; }
+    input[type="file"] { width:100%; padding:10px; margin:16px 0; background:rgba(255,255,255,0.06); border:none; border-radius:6px; color:#f5f5f5; }
+    button { width:100%; padding:12px; background:#f5f5f5; color:#050505; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }
+    .status { margin-top:16px; font-size:0.9rem; opacity:0.8; }
+    a { color:#f5f5f5; text-decoration:underline; }
   </style>
 </head>
 <body>
   <div class="box">
     <h2>Upload to Community</h2>
-    <p>Submit eerie, liminal, or ambient images.</p>
-    
     <form id="uploadForm">
       <input type="file" id="imageFile" accept="image/*" required />
       <button type="submit" id="uploadBtn">Upload</button>
     </form>
-
     <div class="status" id="status"></div>
-    <a href="./index.html" class="back">← Back to gallery</a>
+    <a href="./index.html">← Back</a>
   </div>
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase.js"></script>
   <script>
-    let user = null;
+    let currentUser = null;
 
-    // Check auth on load
+    // Check if logged in
     (async () => {
       const { data } = await supabase.auth.getUser();
-      user = data.user;
-      if (!user) {
-        alert("You must be logged in to upload.");
+      if (!data.user) {
+        alert("You must be logged in.");
         window.location.href = "./login.html";
         return;
       }
-
-      // Optional: show user email
-      document.querySelector('.box h2').innerHTML += ` (${user.email})`;
+      currentUser = data.user;
     })();
 
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (!user) return;
-
       const fileInput = document.getElementById('imageFile');
       const file = fileInput.files[0];
       const statusEl = document.getElementById('status');
       const btn = document.getElementById('uploadBtn');
 
-      if (!file) {
-        statusEl.textContent = "Please select an image.";
-        return;
-      }
+      if (!file || !currentUser) return;
 
       try {
         btn.disabled = true;
         statusEl.textContent = "Uploading...";
 
-        // Get user's role
-        const { data: profile } = await supabase
+        // 🔑 Get user's role
+        const { data: profile, error: profileErr } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', currentUser.id)
           .single();
 
+        if (profileErr) throw profileErr;
         if (!profile) throw new Error("Profile not found");
 
-        // Determine status
+        // 🔑 Set status based on role
         const status = (profile.role === 'admin' || profile.role === 'owner') 
           ? 'approved' 
           : 'pending';
 
-        // Upload to Supabase Storage
+        // 🔑 Upload file to Storage
         const fileName = `${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadErr } = await supabase.storage
           .from('community')
           .upload(`uploads/${fileName}`, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadErr) throw uploadErr;
 
-        // Get public URL
+        // 🔑 Get public URL
         const { data: publicUrlData } = supabase.storage
           .from('community')
           .getPublicUrl(`uploads/${fileName}`);
 
         const url = publicUrlData.publicUrl;
 
-        // Insert into DB
-        const { error: dbError } = await supabase
+        // 🔑 Insert into DB — MUST include uploaded_by and status
+        const { error: dbErr } = await supabase
           .from('images')
           .insert({
             url,
-            uploaded_by: user.id,
-            status
+            uploaded_by: currentUser.id,  // ← critical!
+            status                       // ← critical!
           });
 
-        if (dbError) throw dbError;
+        if (dbErr) throw dbErr;
 
-        statusEl.textContent = status === 'approved' 
-          ? "✅ Uploaded and published!" 
+        statusEl.innerHTML = status === 'approved' 
+          ? "✅ Published!" 
           : "✅ Uploaded! Awaiting approval.";
-
-        // Reset form
-        fileInput.value = '';
-        setTimeout(() => {
-          window.location.href = './index.html';
-        }, 2000);
+        
+        setTimeout(() => window.location.href = './index.html', 2000);
 
       } catch (err) {
         console.error(err);
-        statusEl.textContent = "❌ Error: " + (err.message || 'Upload failed');
+        statusEl.textContent = "❌ " + (err.message || 'Upload failed');
         btn.disabled = false;
       }
     });
