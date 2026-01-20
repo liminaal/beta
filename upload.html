@@ -6,23 +6,68 @@
   <title>Upload · liminaal</title>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    body { background:#050505; color:#f5f5f5; font-family:'Unbounded',sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
-    .box { width:90%; max-width:500px; padding:30px; background:rgba(10,10,10,0.7); border-radius:12px; text-align:center; }
-    input[type="file"] { width:100%; padding:10px; margin:16px 0; background:rgba(255,255,255,0.06); border:none; border-radius:6px; color:#f5f5f5; }
-    button { width:100%; padding:12px; background:#f5f5f5; color:#050505; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }
-    .status { margin-top:16px; font-size:0.9rem; opacity:0.8; }
-    a { color:#f5f5f5; text-decoration:underline; }
+    body {
+      background: #050505;
+      color: #f5f5f5;
+      font-family: 'Unbounded', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .box {
+      width: 90%;
+      max-width: 500px;
+      padding: 30px;
+      background: rgba(10, 10, 10, 0.7);
+      border-radius: 12px;
+      text-align: center;
+    }
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      margin: 16px 0;
+      background: rgba(255, 255, 255, 0.06);
+      border: none;
+      border-radius: 6px;
+      color: #f5f5f5;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #f5f5f5;
+      color: #050505;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 16px;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    a.back {
+      display: inline-block;
+      margin-top: 16px;
+      color: #f5f5f5;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <div class="box">
     <h2>Upload to Community</h2>
+    <p>Submit eerie, liminal, or ambient images.</p>
+    
     <form id="uploadForm">
       <input type="file" id="imageFile" accept="image/*" required />
       <button type="submit" id="uploadBtn">Upload</button>
     </form>
+
     <div class="status" id="status"></div>
-    <a href="./index.html">← Back</a>
+    <a href="./index.html" class="back">← Back to gallery</a>
   </div>
 
   <!-- Supabase -->
@@ -31,46 +76,51 @@
   <script>
     let currentUser = null;
 
-    // Check if logged in
+    // Check if user is logged in
     (async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        alert("You must be logged in.");
+        alert("You must be logged in to upload.");
         window.location.href = "./login.html";
         return;
       }
       currentUser = data.user;
+      document.querySelector('h2').textContent += ` (${currentUser.email})`;
     })();
 
     document.getElementById('uploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (!currentUser) return;
+
       const fileInput = document.getElementById('imageFile');
       const file = fileInput.files[0];
       const statusEl = document.getElementById('status');
       const btn = document.getElementById('uploadBtn');
 
-      if (!file || !currentUser) return;
+      if (!file) {
+        statusEl.textContent = "Please select an image.";
+        return;
+      }
 
       try {
         btn.disabled = true;
         statusEl.textContent = "Uploading...";
 
-        // 🔑 Get user's role
+        // Get user's role from profiles
         const { data: profile, error: profileErr } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', currentUser.id)
           .single();
 
-        if (profileErr) throw profileErr;
-        if (!profile) throw new Error("Profile not found");
+        if (profileErr || !profile) throw new Error("Profile not found");
 
-        // 🔑 Set status based on role
+        // Set status based on role
         const status = (profile.role === 'admin' || profile.role === 'owner') 
           ? 'approved' 
           : 'pending';
 
-        // 🔑 Upload file to Storage
+        // Upload to Supabase Storage
         const fileName = `${Date.now()}-${file.name}`;
         const { error: uploadErr } = await supabase.storage
           .from('community')
@@ -78,33 +128,36 @@
 
         if (uploadErr) throw uploadErr;
 
-        // 🔑 Get public URL
+        // Get public URL
         const { data: publicUrlData } = supabase.storage
           .from('community')
           .getPublicUrl(`uploads/${fileName}`);
 
         const url = publicUrlData.publicUrl;
 
-        // 🔑 Insert into DB — MUST include uploaded_by and status
+        // Insert into DB
         const { error: dbErr } = await supabase
           .from('images')
           .insert({
             url,
-            uploaded_by: currentUser.id,  // ← critical!
-            status                       // ← critical!
+            uploaded_by: currentUser.id,
+            status
           });
 
         if (dbErr) throw dbErr;
 
-        statusEl.innerHTML = status === 'approved' 
-          ? "✅ Published!" 
+        statusEl.innerHTML = status === 'approved'
+          ? "✅ Uploaded and published!"
           : "✅ Uploaded! Awaiting approval.";
-        
-        setTimeout(() => window.location.href = './index.html', 2000);
+
+        fileInput.value = '';
+        setTimeout(() => {
+          window.location.href = './index.html';
+        }, 2000);
 
       } catch (err) {
         console.error(err);
-        statusEl.textContent = "❌ " + (err.message || 'Upload failed');
+        statusEl.textContent = "❌ Error: " + (err.message || 'Upload failed');
         btn.disabled = false;
       }
     });
