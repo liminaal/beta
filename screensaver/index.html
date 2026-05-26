@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Screensaver</title>
+
+    <!-- Google font -->
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+      /* full viewport height and safe centering */
+      html, body {
+        height: 100vh;
+        margin: 0;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #000;
+        color: #fff;
+        font-family: 'Unbounded', sans-serif;
+        overflow: hidden;
+        cursor: none;
+      }
+
+      /* Clock styling */
+      #clock {
+        text-align: center;
+        z-index: 9999;
+        position: relative;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      #time {
+        font-size: 6rem;
+        font-weight: 700;
+        line-height: 0.9;
+        margin: 0;
+      }
+
+      #date {
+        font-size: 2rem;
+        font-weight: 400;
+        margin: 0;
+      }
+
+      /* ===== MEDIA PANEL STYLES ===== */
+      #media-panel {
+        position: relative;
+        z-index: 9998;
+        pointer-events: auto; /* re-enable clicks for controls */
+        cursor: default;
+        display: none; /* hidden by default */
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      #media-panel.visible {
+        display: flex;
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      #media-card {
+        background: rgba(30, 30, 40, 0.65);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        padding: 0.9rem 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        max-width: 90vw;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      #media-artwork {
+        width: 56px;
+        height: 56px;
+        border-radius: 10px;
+        object-fit: cover;
+        background: linear-gradient(135deg, #3a3a5a, #2a2a4a);
+        flex-shrink: 0;
+        display: grid;
+        place-items: center;
+        font-size: 1.5rem;
+        color: rgba(255,255,255,0.6);
+      }
+
+      #media-artwork img {
+        width: 100%;
+        height: 100%;
+        border-radius: 10px;
+        object-fit: cover;
+        display: none;
+      }
+
+      #media-artwork.has-image img {
+        display: block;
+      }
+
+      #media-artwork.has-image .placeholder {
+        display: none;
+      }
+
+      #media-info {
+        min-width: 0;
+        text-align: left;
+      }
+
+      #media-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 280px;
+        margin: 0 0 0.2rem 0;
+      }
+
+      #media-artist {
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: rgba(255,255,255,0.75);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 280px;
+        margin: 0;
+      }
+
+      #media-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.3rem;
+      }
+
+      .media-btn {
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        color: #fff;
+        font-size: 1rem;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        transition: background 0.2s, transform 0.1s;
+        pointer-events: auto;
+      }
+
+      .media-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.05);
+      }
+
+      .media-btn:active {
+        transform: scale(0.95);
+      }
+
+      .media-btn svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      #media-progress {
+        width: 100%;
+        max-width: 420px;
+        height: 4px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        overflow: hidden;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+
+      #media-progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #7b61ff, #4facfe);
+        border-radius: 2px;
+        transition: width 0.1s linear;
+      }
+
+      /* Ensure any p5 canvas is behind the UI */
+      canvas {
+        position: fixed !important;
+        inset: 0;
+        z-index: 0 !important;
+        pointer-events: none;
+      }
+
+      /* Hide cursor when hovering over media panel (optional) */
+      #media-panel:hover {
+        cursor: default;
+      }
+    </style>
+
+    <!-- p5 + addons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.8.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.8.0/addons/p5.dom.min.js"></script>
+
+    <!-- local scripts -->
+    <script src="/assets/screensaver/hsluv.js"></script>
+    <script src="/assets/screensaver/script.js"></script>
+  </head>
+
+  <body>
+    <div id="clock">
+      <div id="time" aria-live="polite"></div>
+      <div id="date"></div>
+    </div>
+
+    <!-- Media Detection Panel -->
+    <div id="media-panel" aria-live="polite" aria-hidden="true">
+      <div id="media-card">
+        <div id="media-artwork">
+          <span class="placeholder">🎵</span>
+          <img id="media-artwork-img" alt="">
+        </div>
+        <div id="media-info">
+          <div id="media-title">No media playing</div>
+          <div id="media-artist">—</div>
+          <div id="media-controls">
+            <button class="media-btn" id="btn-prev" title="Previous" aria-label="Previous track">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="media-btn" id="btn-play-pause" title="Play/Pause" aria-label="Play or pause">
+              <svg id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="icon-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+            <button class="media-btn" id="btn-next" title="Next" aria-label="Next track">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="media-progress">
+        <div id="media-progress-bar"></div>
+      </div>
+    </div>
+
+    <script>
+      // ===== CLOCK FUNCTIONALITY =====
+      function updateTime() {
+        const now = new Date();
+        const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+        const dateOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+        const locale = navigator.language || 'en-US';
+
+        document.getElementById('time').textContent = new Intl.DateTimeFormat(locale, timeOptions).format(now);
+        document.getElementById('date').textContent = new Intl.DateTimeFormat(locale, dateOptions).format(now);
+      }
+      updateTime();
+      setInterval(updateTime, 1000);
+
+      // ===== MEDIA PANEL FUNCTIONALITY =====
+      const mediaPanel = document.getElementById('media-panel');
+      const mediaTitle = document.getElementById('media-title');
+      const mediaArtist = document.getElementById('media-artist');
+      const mediaArtwork = document.getElementById('media-artwork');
+      const mediaArtworkImg = document.getElementById('media-artwork-img');
+      const progressBar = document.getElementById('media-progress-bar');
+      const progressContainer = document.getElementById('media-progress');
+      const btnPlayPause = document.getElementById('btn-play-pause');
+      const iconPlay = document.getElementById('icon-play');
+      const iconPause = document.getElementById('icon-pause');
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+
+      let isPanelVisible = false;
+      let mediaDuration = 0;
+      let mediaCurrentTime = 0;
+      let updateInterval = null;
+
+      // Show/hide panel with animation
+      function setPanelVisibility(visible) {
+        if (visible === isPanelVisible) return;
+        isPanelVisible = visible;
+        mediaPanel.classList.toggle('visible', visible);
+        mediaPanel.setAttribute('aria-hidden', !visible);
+        
+        if (visible) {
+          startProgressUpdate();
+        } else {
+          stopProgressUpdate();
+          progressBar.style.width = '0%';
+        }
+      }
+
+      // Update playback progress bar
+      function startProgressUpdate() {
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(() => {
+          if (mediaDuration > 0) {
+            // Try to get real time from active media element if available
+            const activeMedia = document.querySelector('video:not([paused]), audio:not([paused])');
+            if (activeMedia && !isNaN(activeMedia.duration)) {
+              mediaCurrentTime = activeMedia.currentTime;
+              mediaDuration = activeMedia.duration;
+            }
+            const percent = (mediaCurrentTime / mediaDuration) * 100;
+            progressBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+          }
+        }, 500);
+      }
+
+      function stopProgressUpdate() {
+        if (updateInterval) {
+          clearInterval(updateInterval);
+          updateInterval = null;
+        }
+      }
+
+      // Update panel with media metadata
+      function updateMediaPanel(metadata, isPlaying = false) {
+        mediaTitle.textContent = metadata.title || 'Unknown Title';
+        mediaArtist.textContent = metadata.artist || metadata.album || 'Unknown Artist';
+        
+        // Handle artwork
+        if (metadata.artwork && metadata.artwork.length > 0) {
+          const bestArt = metadata.artwork
+            .filter(a => a.src)
+            .sort((a, b) => (b.sizes?.[0] || 0) - (a.sizes?.[0] || 0))[0];
+          
+          if (bestArt?.src) {
+            mediaArtworkImg.src = bestArt.src;
+            mediaArtwork.classList.add('has-image');
+          } else {
+            mediaArtwork.classList.remove('has-image');
+          }
+        } else {
+          mediaArtwork.classList.remove('has-image');
+        }
+
+        // Update play/pause icon
+        iconPlay.style.display = isPlaying ? 'none' : 'block';
+        iconPause.style.display = isPlaying ? 'block' : 'none';
+
+        setPanelVisibility(true);
+      }
+
+      // Reset panel
+      function resetMediaPanel() {
+        mediaTitle.textContent = 'No media playing';
+        mediaArtist.textContent = '—';
+        mediaArtwork.classList.remove('has-image');
+        mediaArtworkImg.src = '';
+        iconPlay.style.display = 'block';
+        iconPause.style.display = 'none';
+        setPanelVisibility(false);
+      }
+
+      // Listen for Media Session API updates
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+          document.querySelector('video, audio')?.play();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          document.querySelector('video, audio')?.pause();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+          // Optional: trigger previous track if your app supports it
+          console.log('Previous track requested');
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+          console.log('Next track requested');
+        });
+
+        // Poll for media session state changes
+        setInterval(() => {
+          const metadata = navigator.mediaSession.metadata;
+          const playbackState = navigator.mediaSession.playbackState;
+          
+          if (metadata && playbackState !== 'none') {
+            const metaObj = {
+              title: metadata.title,
+              artist: metadata.artist,
+              album: metadata.album,
+              artwork: metadata.artwork
+            };
+            updateMediaPanel(metaObj, playbackState === 'playing');
+            
+            // Try to sync progress from actual media element
+            const mediaEl = document.querySelector('video, audio');
+            if (mediaEl && !isNaN(mediaEl.duration)) {
+              mediaDuration = mediaEl.duration;
+              mediaCurrentTime = mediaEl.currentTime;
+            }
+          } else {
+            // Fallback: check for playing <video> or <audio> elements
+            const playingMedia = document.querySelector('video:not([paused]), audio:not([paused])');
+            if (playingMedia) {
+              const metaObj = {
+                title: playingMedia.title || 'Now Playing',
+                artist: playingMedia.dataset.artist || '',
+                artwork: []
+              };
+              updateMediaPanel(metaObj, true);
+              mediaDuration = playingMedia.duration || 0;
+              mediaCurrentTime = playingMedia.currentTime || 0;
+            } else {
+              resetMediaPanel();
+            }
+          }
+        }, 1000);
+      } else {
+        // Fallback for browsers without Media Session API
+        setInterval(() => {
+          const playingMedia = document.querySelector('video:not([paused]), audio:not([paused])');
+          if (playingMedia) {
+            const metaObj = {
+              title: playingMedia.title || 'Now Playing',
+              artist: playingMedia.dataset.artist || 'Unknown',
+              artwork: []
+            };
+            updateMediaPanel(metaObj, true);
+            mediaDuration = playingMedia.duration || 0;
+            mediaCurrentTime = playingMedia.currentTime || 0;
+          } else {
+            resetMediaPanel();
+          }
+        }, 1000);
+      }
+
+      // Control button handlers
+      btnPlayPause.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mediaEl = document.querySelector('video, audio');
+        if (!mediaEl) return;
+        
+        if (mediaEl.paused) {
+          mediaEl.play().catch(err => console.log('Play failed:', err));
+        } else {
+          mediaEl.pause();
+        }
+      });
+
+      btnPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Dispatch to media session or custom handler
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.setActionHandler('previoustrack')?.();
+        }
+      });
+
+      btnNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.setActionHandler('nexttrack')?.();
+        }
+      });
+
+      // Progress bar seeking
+      progressContainer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mediaEl = document.querySelector('video, audio');
+        if (!mediaEl || !mediaDuration) return;
+        
+        const rect = progressContainer.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        const newTime = Math.max(0, Math.min(1, percent)) * mediaDuration;
+        
+        mediaEl.currentTime = newTime;
+        mediaCurrentTime = newTime;
+      });
+
+      // Hide panel when mouse is idle (optional enhancement)
+      let idleTimer;
+      function resetIdleTimer() {
+        mediaPanel.style.opacity = '1';
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (isPanelVisible) {
+            mediaPanel.style.opacity = '0.85';
+          }
+        }, 3000);
+      }
+      document.addEventListener('mousemove', resetIdleTimer);
+      resetIdleTimer();
+
+      // Ensure panel doesn't block clock clicks
+      mediaPanel.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+    </script>
+  </body>
+</html>
